@@ -1,12 +1,13 @@
 ﻿using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
+using System.Diagnostics;
 
 internal class Program
 {
-    private static void Main(string[] args)
+    private static async Task Main(string[] args)
     {
         Chatting();
-        List<string> validImageExtensions = [".bmp", ".jpeg", ".png"];
+        List<string> validImageExtensions = [".bmp", ".jpeg", ".png", ".jpg"];
         var imagesPath = GetValidLocation();
         Console.WriteLine("Folder Found");
         string[] files = Directory.GetFiles(imagesPath);
@@ -33,13 +34,17 @@ internal class Program
                     Console.WriteLine("Unable to Create your folder");
                     return;
                 }
+                Stopwatch stopwatch = Stopwatch.StartNew();
                 foreach (var item in validFiles)
                 {
                     count++;
                     Console.WriteLine($"Processing file {count}");
-                    _ = ResizeImage(createFolder.FullName, item);
-                    Console.WriteLine($"Completed file {count}");
+                    var processed = ResizeImage(createFolder.FullName, item);
+                    var message = processed ? "Successfully" : "Unsuccessfully";
+                    Console.WriteLine($"Completed file {count} {message}");
                 }
+                stopwatch.Stop();
+                Console.WriteLine("Elapsed time: {0} s", stopwatch.ElapsedMilliseconds / 1000);
             }
         }
     }
@@ -61,6 +66,24 @@ internal class Program
             return false;
         }
     }
+
+    //private static async Task<bool> ResizeImageAsync(string pathToSave, string imageFile)
+    //{
+    //    try
+    //    {
+    //        using Image image = await Image.LoadAsync(imageFile);
+    //        image.Mutate(x => x.Resize(image.Width / 5, image.Height / 5));
+    //        string fileToSave = Path.Combine(pathToSave, Path.GetFileName(imageFile));
+    //        await image.SaveAsync(fileToSave);
+    //        image.Dispose();
+    //        return true;
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        Console.WriteLine(ex.Message.ToString());
+    //        return false;
+    //    }
+    //}
 
     private static string GetValidLocation()
     {
