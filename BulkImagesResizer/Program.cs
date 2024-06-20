@@ -1,60 +1,74 @@
 ﻿using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
-using System.Diagnostics;
 
 internal class Program
 {
     private static async Task Main(string[] args)
     {
         Chatting();
-        List<string> validImageExtensions = [".bmp", ".jpeg", ".png", ".jpg"];
         var imagesPath = GetValidLocation();
-        Console.WriteLine("Folder Found");
-        string[] files = Directory.GetFiles(imagesPath);
-        if (files.Length < 1)
-        {
-            Console.WriteLine("This folder is empty");
-            return;
-        }
-        else
-        {
-            var validFiles = files.Where(x => validImageExtensions.Contains(Path.GetExtension(x).ToLower())).ToList();
-            if (validFiles.Count < 1)
-            {
-                Console.WriteLine("This folder contains no image");
-                return;
-            }
-            else
-            {
-                Console.WriteLine($"Your folder contains {validFiles.Count} Valid Images");
-                int count = 0;
-                var createFolder = Directory.CreateDirectory(Path.Combine(imagesPath, "compressed"));
-                if (!createFolder.Exists)
-                {
-                    Console.WriteLine("Unable to Create your folder");
-                    return;
-                }
-                Stopwatch stopwatch = Stopwatch.StartNew();
-                foreach (var item in validFiles)
-                {
-                    count++;
-                    Console.WriteLine($"Processing file {count}");
-                    var processed = ResizeImage(createFolder.FullName, item);
-                    var message = processed ? "Successfully" : "Unsuccessfully";
-                    Console.WriteLine($"Completed file {count} {message}");
-                }
-                stopwatch.Stop();
-                Console.WriteLine("Elapsed time: {0} s", stopwatch.ElapsedMilliseconds / 1000);
-            }
-        }
+        var testRun = PerformTestRun();
+        int compressionLevel = GetCompressionLevel();
+        Compression(imagesPath.Item1, imagesPath.Item2, compressionLevel, testRun);
     }
 
-    private static bool ResizeImage(string pathToSave, string imageFile)
+    static bool PerformTestRun()
+    {
+        Console.Write("Would you like a test run? (yes/no): ");
+        string response = Console.ReadLine().Trim().ToLower();
+        if (response != "yes" && response != "no")
+        {
+            Console.WriteLine("Invalid response. Please enter 'yes' or 'no'.");
+            return false;
+        }
+        return response == "yes";
+    }
+
+    static int GetCompressionLevel()
+    {
+        int compressionLevel;
+        while (true)
+        {
+            Console.Write("Please enter a compression level between 1 and 5: ");
+            string input = Console.ReadLine().Trim();
+            if (int.TryParse(input, out compressionLevel) && compressionLevel >= 1 && compressionLevel <= 5)
+            {
+                break;
+            }
+            Console.WriteLine("Invalid input. Compression level must be an integer between 1 and 5.");
+        }
+        return compressionLevel+1;
+    }
+
+    private static void Compression(string path, List<string> files, int compressionLevel = 1, bool testRun = false)
+    {
+        int count = 0;
+        var createFolder = Directory.CreateDirectory(Path.Combine(path, "compressed"));
+        if (!createFolder.Exists)
+        {
+            Console.WriteLine("Unable to Create your folder");
+            return;
+        }
+        foreach (var item in files)
+        {
+            count++;
+            var processed = ResizeImage(createFolder.FullName, item, compressionLevel);
+            var message = processed ? "Successfully" : "Unsuccessfully";
+            Console.WriteLine($"Completed file {count} {message}");
+            if (testRun && count > 2) {
+                Console.WriteLine("Test Run Completed");
+                break;
+            }
+        }
+        Console.WriteLine("Bye baby. I guess we are done.xoxoxo");
+    }
+
+    private static bool ResizeImage(string pathToSave, string imageFile, int compressionLevel)
     {
         try
         {
             using Image image = Image.Load(imageFile);
-            image.Mutate(x => x.Resize(image.Width / 5, image.Height / 5));
+            image.Mutate(x => x.Resize(image.Width / compressionLevel, image.Height / compressionLevel));
             string fileToSave = Path.Combine(pathToSave, Path.GetFileName(imageFile));
             image.Save(fileToSave);
             image.Dispose();
@@ -67,26 +81,48 @@ internal class Program
         }
     }
 
-    //private static async Task<bool> ResizeImageAsync(string pathToSave, string imageFile)
-    //{
-    //    try
-    //    {
-    //        using Image image = await Image.LoadAsync(imageFile);
-    //        image.Mutate(x => x.Resize(image.Width / 5, image.Height / 5));
-    //        string fileToSave = Path.Combine(pathToSave, Path.GetFileName(imageFile));
-    //        await image.SaveAsync(fileToSave);
-    //        image.Dispose();
-    //        return true;
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        Console.WriteLine(ex.Message.ToString());
-    //        return false;
-    //    }
-    //}
-
-    private static string GetValidLocation()
+    private static (bool, List<string>) ValidateFolderHasImages(string path)
     {
+        string userInput = string.Empty;
+        List<string> validImages = [];
+        bool isValid = false;
+        while (!isValid)
+        {
+            List<string> validImageExtensions = [".bmp", ".jpeg", ".png", ".jpg"];
+            string[] files = Directory.GetFiles(path);
+            if (files.Length < 1)
+            {
+                Console.WriteLine("This folder is empty");
+                break;
+            }
+            else
+            {
+                var validFiles = files.Where(x => validImageExtensions.Contains(Path.GetExtension(x).ToLower())).ToList();
+                if (validFiles.Count < 1)
+                {
+                    Console.WriteLine("This folder contains no image");
+                    break;
+                }
+                else
+                {
+                    Console.WriteLine($"Your folder contains {validFiles.Count} Valid Images");
+                    Console.WriteLine($"Is this Correct ? Should the process begin ?");
+                    userInput = Console.ReadLine();
+                    if (userInput.Contains("yes"))
+                    {
+                        validImages = validFiles;
+                        isValid = true;
+                        break;
+                    }
+                }
+            }
+        }
+        return (isValid, validImages);
+    }
+
+    private static (string, List<string>) GetValidLocation()
+    {
+        List<string> validImages = [];
         string imagesPath = string.Empty;
         var isValid = false;
         while (!isValid)
@@ -99,11 +135,16 @@ internal class Program
             imagesPath = $@"{userDirectory}\{imagesLocation}"; ;
             Console.Write($"Is this the valid location of your images {imagesPath} ? ");
             var userInput = Console.ReadLine();
-            if (new List<string> { "yes", "yea"}.Contains(userInput.ToLower()))
+            if (new List<string> { "yes", "yea" }.Contains(userInput.ToLower()))
             {
                 if (Path.Exists(imagesPath))
                 {
-                    isValid = true;
+                    var validateImagePresent = ValidateFolderHasImages(imagesPath);
+                    if (validateImagePresent.Item1)
+                    {
+                        isValid = true;
+                        validImages = validateImagePresent.Item2;
+                    }
                 }
                 else
                 {
@@ -111,11 +152,12 @@ internal class Program
                 }
             }
         }
-        return imagesPath;
+        return (imagesPath, validImages);
     }
 
     private static void Chatting()
     {
+        string userInput = string.Empty;
         var isValid = false;
         List<string> validHowAreYouResponses = ["fine",
             "good",
@@ -133,17 +175,28 @@ internal class Program
             "satisfactory"];
         while (!isValid)
         {
-            Console.WriteLine("Hi Baby!");
-            Console.Write("How is my woman doing ? ");
-            string userInput = Console.ReadLine();
-            if (validHowAreYouResponses.Contains(userInput.ToLower()))
+            Console.WriteLine("Hi");
+            userInput = Console.ReadLine();
+            Console.WriteLine("Whoooooooooooo pleaseeeeee");
+            userInput = Console.ReadLine();
+            if (userInput.ToLower().Contains("kele"))
             {
-                Console.WriteLine("Good, Oya you can start converting your images, its quite straight forward just follow the prompts");
-                isValid = true;
+                Console.WriteLine("oh, Hi Baby!");
+                Console.Write("How is my woman doing ? ");
+                userInput = Console.ReadLine();
+                if (validHowAreYouResponses.Contains(userInput.ToLower()))
+                {
+                    Console.WriteLine("Good, Oya you can start converting your images, its quite straight forward just follow the prompts");
+                    isValid = true;
+                }
+                else
+                {
+                    Console.WriteLine("Lol, OverSabi, how do you manage to type a response i do not have in my response List, TRY AGAIN");
+                }
             }
             else
             {
-                Console.WriteLine("Lol, OverSabi, how do you manage to type a response i do not have in my response List, TRY AGAIN");
+                Console.WriteLine("Lol, I do not know you oh, please try again");
             }
         }
     }
